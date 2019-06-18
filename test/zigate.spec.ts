@@ -18,7 +18,7 @@ describe('ZiGate', () => {
 
   it('should create', () => {
     /*** WHEN ***/
-    const zigate = new ZiGate('/dev/ttyUSB0')
+    const zigate = new ZiGate('file:///dev/ttyUSB0')
 
     /*** THEN ***/
     expect(zigate).toBeInstanceOf(ZiGate)
@@ -45,21 +45,21 @@ describe('ZiGate', () => {
 
   it('should send a command', () => {
     /*** GIVEN ***/
-    const zigate = new ZiGate('/dev/ttyUSB0')
-    spyOn(zigate.serialPort, 'write')
+    const zigate = new ZiGate('file:///dev/ttyUSB0')
+    spyOn(zigate.port, 'write')
 
     /*** WHEN ***/
     zigate.sendCommand(ZGCommandCode.PermitJoin, { interval: 30 })
 
     /*** THEN ***/
-    expect(zigate.serialPort.write).toHaveBeenCalledWith(
+    expect(zigate.port.write).toHaveBeenCalledWith(
       Buffer.from([0x1, 0x0, 0x49, 0x0, 0x4, 0x50, 0xff, 0xfc, 0x1e, 0x0, 0x3])
     )
   })
 
   it('should create a device', () => {
     /*** GIVEN ***/
-    const zigate = new ZiGate('/dev/ttyUSB0')
+    const zigate = new ZiGate('file:///dev/ttyUSB0')
 
     /*** WHEN ***/
     const device = zigate.createDevice(ZGDeviceType.XiaomiAqaraButton, 'fffe')

@@ -7,6 +7,7 @@ import { createZGCommand, ZGCommandCode, ZGCommandPayload } from './command'
 import { createZGDevice, ZGDevice, ZGDeviceType } from './device'
 import debug from './debug'
 import Delimiter = SerialPort.parsers.Delimiter
+import { Socket, createConnection } from 'net'
 
 export { ZGDeviceType } from './device'
 export { ZGCommandCode, ZGCommandPayload } from './command'
@@ -14,22 +15,27 @@ export { ZGCommandCode, ZGCommandPayload } from './command'
 export class ZiGate {
   messages$: Observable<ZGMessage>
 
-  serialPort: SerialPort
-  serialPortParser: Delimiter
+  port: SerialPort | Socket
+  parser: Delimiter
 
   constructor(path: string) {
-    this.serialPort = new SerialPort(path, {
-      baudRate: 115200
-    })
+    if (path.indexOf('net://') === 0) {
+      this.port = createConnection(9999, path.substr(6))
+    } else if (path.indexOf('file://') === 0) {
+      this.port = new SerialPort(path.substr(7), {
+        baudRate: 115200
+      })
+    } else {
+      throw new Error('unknown endpoint for zigate')
+    }
 
-    this.serialPortParser = this.serialPort.pipe(
+    this.parser = this.port.pipe(
       new SerialPort.parsers.Delimiter({
-        delimiter: [ZGFrame.STOP_BYTE],
-        includeDelimiter: true
+        delimiter: [ZGFrame.STOP_BYTE]
       })
     )
 
-    this.messages$ = fromEvent(this.serialPortParser, 'data').pipe(
+    this.messages$ = fromEvent(this.parser, 'data').pipe(
       map((frame: Buffer) => {
         debug('serial:in')(frame)
         const zgFrame = new ZGFrame(frame)
@@ -38,7 +44,7 @@ export class ZiGate {
       share()
     )
 
-    this.serialPortParser.on('error', err => {
+    this.parser.on('error', err => {
       console.error(err.message)
     })
   }
@@ -54,7 +60,7 @@ export class ZiGate {
     }
 
     debug('serial:out')(frame.toBuffer())
-    this.serialPort.write(frame.toBuffer())
+    this.port.write(frame.toBuffer())
   }
 
   createDevice = (type: ZGDeviceType, shortAddress: string): ZGDevice => {
