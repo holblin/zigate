@@ -1,3 +1,4 @@
+import net from 'net'
 import SerialPort from 'serialport'
 import { ZGFrame } from './frame'
 import { createZGMessage, ZGMessage } from './message'
@@ -14,15 +15,20 @@ export { ZGCommandCode, ZGCommandPayload } from './command'
 export class ZiGate {
   messages$: Observable<ZGMessage>
 
-  serialPort: SerialPort
-  serialPortParser: Delimiter
+  // private serialPort: SerialPort
+  private serialPortParser: Delimiter
+  private port: net.Socket
+  private ip: string
 
   constructor(path: string) {
-    this.serialPort = new SerialPort(path, {
-      baudRate: 115200
-    })
+    this.ip = '192.168.1.35'
+    this.port = net.createConnection(9999, this.ip)
 
-    this.serialPortParser = this.serialPort.pipe(
+    // this.serialPort = new SerialPort(path, {
+    //   baudRate: 115200
+    // })
+
+    this.serialPortParser = this.port.pipe(
       new SerialPort.parsers.Delimiter({
         delimiter: [ZGFrame.STOP_BYTE],
         includeDelimiter: true
@@ -32,6 +38,11 @@ export class ZiGate {
     this.messages$ = fromEvent(this.serialPortParser, 'data').pipe(
       map((frame: Buffer) => {
         debug('serial:in')(frame)
+        // console.log('<= ' + Buffer.concat([frame, Buffer.from([ZGFrame.STOP_BYTE])], frame.length + 1).toString('hex'));
+        // // return frame;
+        // const zgFrame = new ZGFrame(Buffer.concat([frame, Buffer.from([ZGFrame.STOP_BYTE])], frame.length + 1))
+        console.log('<= ' + frame.toString('hex'))
+        // return frame;
         const zgFrame = new ZGFrame(frame)
         return createZGMessage(zgFrame.readMsgCode(), zgFrame.msgPayloadBytes)
       }),
@@ -54,7 +65,8 @@ export class ZiGate {
     }
 
     debug('serial:out')(frame.toBuffer())
-    this.serialPort.write(frame.toBuffer())
+    console.log('=> ' + frame.toBuffer().toString('hex'))
+    this.port.write(frame.toBuffer())
   }
 
   createDevice = (type: ZGDeviceType, shortAddress: string): ZGDevice => {
